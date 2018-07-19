@@ -49,8 +49,8 @@ const mainServer = function(req, res) {
     req.on('end', _ => {
         buffer += decoder.end();
 
-        // Choose the handler this request should go to,
-        // if one is not found, use the notFound handler
+        // Choose the route this request should go to,
+        // if one is not found, use the notFound route
         const choosenHandler = typeof(router[path]) !== 'undefined' ? 
                                 router[path] : router.notFound;
         
@@ -68,7 +68,7 @@ const mainServer = function(req, res) {
             // Use the status code called back by the handler, or default to 200
             statusCode = typeof(statusCode) == 'number' ? statusCode : 200;
 
-            // Use the peyload called back by the handler, 
+            // Use the payload called back by the handler, 
             // or default to empty object
             payload = typeof(payload) == 'object' ? payload : {};
 
