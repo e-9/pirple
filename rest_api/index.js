@@ -2,7 +2,7 @@
 
 /*
 * Primary file for the API
-*
+* Lesson: Connecting to an API
 */ 
 
 // Dependencies
