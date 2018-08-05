@@ -62,3 +62,4 @@ typings/
 
 # Local data folder
 .data/
+.logs/
