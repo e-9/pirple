@@ -13,6 +13,7 @@
  const http = require('http');
  const helpers = require('./helpers');
  const url = require('url');
+ const _logs = require('./logs');
 
  // Instantiate the worker object
  let workers = {};
@@ -81,7 +82,7 @@ workers.performCheck = function(originalCheckData) {
     let outcomeSent = false;
 
     // Parse the hostname and the path out of the original check data
-    const parsedUrl = url.parse(originalCheckData.protocol+'//'+originalCheckData.url, true);
+    const parsedUrl = url.parse(originalCheckData.protocol+'://'+originalCheckData.url, true);
     const hostName = parsedUrl.hostname;
     const path = parsedUrl.path; // using path and not pathname because we want the query string
 
@@ -155,10 +156,14 @@ workers.processCheckOutcome = function(originalCheckData, checkOutcome) {
                             originalCheckData.state !== state ? 
                             true : false;
     
+    // Lof the outcome
+    const timeOfCheck = Date.now();
+    workers.log(originalCheckData, checkOutcome, state, alertWarranted, timeOfCheck);
+
     // Update the check data
     let newCheckData = originalCheckData;
     newCheckData.state = state;
-    newCheckData.lastChecked = Date.now();
+    newCheckData.lastChecked = timeOfCheck;
 
     // Save the updates
     _data.update('checks', newCheckData.id, newCheckData)
@@ -182,11 +187,67 @@ workers.alertUserToStatusChange = function(newCheckData) {
     })
 };
 
+//
+workers.log = function(originalCheckData, checkOutcome, state, alertWarranted, timeOfCheck) {
+    // Form the log data
+    const logData = {
+        'check' : originalCheckData,
+        'outcome' : checkOutcome,
+        'state' : state,
+        'alert' : alertWarranted,
+        'time' : timeOfCheck
+    };
+
+    // Convert data to string
+    const logString = JSON.stringify(logData);
+
+    // Determine the name of the log file
+    const logFileName = originalCheckData.id;
+
+    // Append the log string to the file
+    _logs.append(logFileName, logString)
+    .then( _ => console.log('Logging to file succeeded'))
+    .catch( err => console.log('Logging to file failed, ' + err));
+}
+
  // Timer to execute the worker-process once per minute
 workers.loop = function() {
     setInterval( _ => {
         workers.gatherAllChecks();
     }, 1000 * 60);
+};
+
+// Rotate (compress) the log files
+workers.rotateLogs = function() {
+    // List all the (non compressed) log files
+    _logs.list(false)
+    .then( logs => {
+        if(logs.length > 0) {
+            logs.forEach( logName => {
+                // Compress the data to a different file
+                const logId = logName.replace('.log', '');
+                const newFileId = logId + '-' + Date.now();
+                
+                _logs.compress(logId, newFileId)
+                .then( _ => {
+                    // Truncate the log
+                    _logs.truncate(logId)
+                    .then( _ => console.log('Success truncating logFile'))
+                    .catch( err => console.log('Error truncating logFile'));
+                })
+                .catch( err => console.log('Error compressing one of the log files', err));
+            });
+        }
+        else console.log('Warning: could not find any logs to rotate');
+    })
+    .catch( err => console.log('Warning: could not find any logs to rotate'));
+}
+
+// Timer to execute the log-rotation process once per day
+workers.logRotationLoop = function() {
+    setInterval( _ => {
+        workers.rotateLogs();
+    }, 1000 * 60 * 60 * 24);
 };
 
  // Init script
@@ -196,6 +257,12 @@ workers.loop = function() {
 
      // Call the loop so the checks will execute later on
      workers.loop();
+
+     // Compress all the logs immediately
+     workers.rotateLogs();
+
+     // Call the compression loop so logs will be compressed later on
+     workers.logRotationLoop();
  };
 
  // Export module
