@@ -419,11 +419,17 @@ handlers._checks.post = function(data, callback) {
                     data.payload.successCodes instanceof Array &&
                     data.payload.successCodes.length > 0  ?
                     data.payload.successCodes : false;
-    const timeoutSeconds = typeof(data.payload.timeoutSeconds) === 'number' &&
-                    data.payload.timeoutSeconds % 1 === 0 &&
-                    data.payload.timeoutSeconds >= 1
-                    data.payload.timeoutSeconds <= 5  ?
-                    data.payload.timeoutSeconds : false;
+    // const timeoutSeconds = typeof(data.payload.timeoutSeconds) === 'number' &&
+    //                 data.payload.timeoutSeconds % 1 === 0 &&
+    //                 data.payload.timeoutSeconds >= 1
+    //                 data.payload.timeoutSeconds <= 5  ?
+    //                 data.payload.timeoutSeconds : false;
+    var timeoutSeconds = typeof(data.payload.timeoutSeconds) === 'number' && 
+                        data.payload.timeoutSeconds % 1 === 0 && 
+                        data.payload.timeoutSeconds >= 1 && 
+                        data.payload.timeoutSeconds <= 5 ? 
+                        data.payload.timeoutSeconds : false;
+
 
     if(protocol && url && method && successCodes && timeoutSeconds) {
         // Get the token from the headers
