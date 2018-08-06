@@ -14,6 +14,8 @@
  const helpers = require('./helpers');
  const url = require('url');
  const _logs = require('./logs');
+ const util = require('util');
+ const debug = util.debuglog('workers');
 
  // Instantiate the worker object
  let workers = {};
@@ -33,11 +35,11 @@ workers.gatherAllChecks = function() {
                         workers.validateCheckData(originalCheckData);
                     }
                 })
-                .catch( err => console.log('Error: Error reading one of the checks data:'));
+                .catch( err => debug('Error: Error reading one of the checks data:'));
             });
         }
     })
-    .catch( err => console.log('Error: Could not find any checks to process'));
+    .catch( err => debug('Error: Could not find any checks to process'));
 };
 
 // Sanity-check the check-data
@@ -65,7 +67,7 @@ workers.validateCheckData = function(originalCheckData) {
         workers.performCheck(originalCheckData);
     } else {
         // If checks fail, log the error and fail silently
-        console.log("Error: one of the checks is not properly formatted. Skipping.");
+        debug("Error: one of the checks is not properly formatted. Skipping.");
     }
 }
 
@@ -172,18 +174,18 @@ workers.processCheckOutcome = function(originalCheckData, checkOutcome) {
         if(alertWarranted) {
             workers.alertUserToStatusChange(newCheckData);
         }
-        else console.log('Check outcome has not changed, no alert needed');
+        else debug('Check outcome has not changed, no alert needed');
         
     })
-    .catch( err => console.log('Error trying to save updates to one of the checks'));
+    .catch( err => debug('Error trying to save updates to one of the checks'));
 };
 
 // Alert the user as to a change in their check status
 workers.alertUserToStatusChange = function(newCheckData) {
     const msg = `Alert: Your check for ${newCheckData.method.toUpperCase()} ${newCheckData.protocol}://${newCheckData.url} is currently ${newCheckData.state}`;
     helpers.sendTwilioSms(newCheckData.userPhone, msg, err => {
-        if(!err) console.log('Success: User was alerted to a status change in their check, via sms');
-        else console.log('Error: Could not send sms alert to user who had a state change in their check');
+        if(!err) debug('Success: User was alerted to a status change in their check, via sms');
+        else debug('Error: Could not send sms alert to user who had a state change in their check');
     })
 };
 
@@ -206,8 +208,8 @@ workers.log = function(originalCheckData, checkOutcome, state, alertWarranted, t
 
     // Append the log string to the file
     _logs.append(logFileName, logString)
-    .then( _ => console.log('Logging to file succeeded'))
-    .catch( err => console.log('Logging to file failed, ' + err));
+    .then( _ => debug('Logging to file succeeded'))
+    .catch( err => debug('Logging to file failed, ' + err));
 }
 
  // Timer to execute the worker-process once per minute
@@ -232,15 +234,15 @@ workers.rotateLogs = function() {
                 .then( _ => {
                     // Truncate the log
                     _logs.truncate(logId)
-                    .then( _ => console.log('Success truncating logFile'))
-                    .catch( err => console.log('Error truncating logFile'));
+                    .then( _ => debug('Success truncating logFile'))
+                    .catch( err => debug('Error truncating logFile'));
                 })
-                .catch( err => console.log('Error compressing one of the log files', err));
+                .catch( err => debug('Error compressing one of the log files', err));
             });
         }
-        else console.log('Warning: could not find any logs to rotate');
+        else debug('Warning: could not find any logs to rotate');
     })
-    .catch( err => console.log('Warning: could not find any logs to rotate'));
+    .catch( err => debug('Warning: could not find any logs to rotate'));
 }
 
 // Timer to execute the log-rotation process once per day
@@ -252,17 +254,21 @@ workers.logRotationLoop = function() {
 
  // Init script
  workers.init = function() {
-     // Execute all the checks
-     workers.gatherAllChecks();
 
-     // Call the loop so the checks will execute later on
-     workers.loop();
+    // Send to console, in yellow
+    console.log('\x1b[33m%s\x1b[0m', 'Background workers are running');
 
-     // Compress all the logs immediately
-     workers.rotateLogs();
+    // Execute all the checks
+    workers.gatherAllChecks();
 
-     // Call the compression loop so logs will be compressed later on
-     workers.logRotationLoop();
+    // Call the loop so the checks will execute later on
+    workers.loop();
+
+    // Compress all the logs immediately
+    workers.rotateLogs();
+
+    // Call the compression loop so logs will be compressed later on
+    workers.logRotationLoop();
  };
 
  // Export module
